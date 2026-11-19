@@ -1,0 +1,71 @@
+services:
+  database:
+    build: ./database
+    container_name: minishop-database
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - minishop-net
+    # The healthcheck also (idempotently) initiates the single-node replica set,
+    # so the replica set is ready on a fresh install without manual steps.
+    healthcheck:
+      test: ["CMD", "bash", "/usr/local/bin/mongo-healthcheck.sh"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 10s
+
+  backend:
+    build: ./backend
+    container_name: minishop-backend
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      MONGO_URI: ${MONGO_URI:-mongodb://database:27017/?replicaSet=rs0}
+      MONGO_DB_NAME: ${MONGO_DB_NAME:-minishop}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-please-0123456789abcdef}
+      ENABLE_DEV_SCENARIOS: ${ENABLE_DEV_SCENARIOS:-true}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@minishop.dev}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-Admin@12345}
+      SEED_CUSTOMER_PASSWORD: ${SEED_CUSTOMER_PASSWORD:-Customer@12345}
+      MONITOR_WINDOW_SECONDS: ${MONITOR_WINDOW_SECONDS:-60}
+      TRACE_SAMPLE_RATE: ${TRACE_SAMPLE_RATE:-0.2}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+    ports:
+      - "8000:8000"
+    networks:
+      - minishop-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=4).status == 200 else 1)"]
+      interval: 10s
+      timeout: 6s
+      retries: 12
+      start_period: 20s
+
+  frontend:
+    build: ./frontend
+    container_name: minishop-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+
+      VITE_PROXY_TARGET: http://backend:8000
+    ports:
+      - "3000:3000"
+    networks:
+      - minishop-net
+
+networks:
+  minishop-net:
+    driver: bridge
+
+volumes:
+  mongo_data:
