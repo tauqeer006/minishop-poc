@@ -1,114 +1,370 @@
-# MiniShop — Application-Level Intelligent Fault Rectification POC
+# <div align="center">MiniShop</div>
 
-A small e-commerce / order-management application (React + FastAPI + MongoDB) built as a research
-environment for **application-level fault detection and rectification**. It contains real business
-workflows, structured observability (events, traces, latency windows, baselines) and controlled fault
-scenarios for nine rectification rules (APP-R-001, 002, 004, 020, 021, 030, 040, 041 and the new **APP-R-056**
-API response-time degradation rule).
+<p align="center">
+  <strong>Application-Level Intelligent Fault Rectification POC</strong>
+</p>
 
-> **Scope of this phase.** Implemented: the application, protections for the eight original rules,
-> structured events, endpoint latency monitoring, historical baselines, threshold-based sustained-degradation
-> detection, distributed tracing, trace-based bottleneck evidence, incident records, verification/escalation logic,
-> controlled scenarios, ML-interface contracts and the corrective-action registry **definitions**.
-> **Not implemented (next phase):** any ML model/inference and any automatic corrective-action execution.
-> See [docs/FUTURE_RECTIFICATION.md](docs/FUTURE_RECTIFICATION.md).
+<p align="center">
+  <a href="http://localhost:3000"><img src="https://img.shields.io/badge/Web-React_18-61DAFB?logo=react&logoColor=white" alt="React"></a>
+  <a href="http://localhost:8000/docs"><img src="https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI"></a>
+  <img src="https://img.shields.io/badge/Database-MongoDB_7-47A248?logo=mongodb&logoColor=white" alt="MongoDB">
+  <img src="https://img.shields.io/badge/Runtime-Docker-2496ED?logo=docker&logoColor=white" alt="Docker">
+</p>
 
-## Technology stack
-Frontend: React 18, Vite, React Router, Axios, Tailwind CSS, Context API · Backend: Python 3.12, FastAPI, Pydantic,
-PyMongo (async), JWT (PyJWT) + bcrypt, structured JSON logging, OpenTelemetry-compatible tracing (W3C `traceparent`,
-32/16-hex ids) · Database: MongoDB 7 single-node replica set (required for transactions) · Docker Compose.
+<p align="center">
+  A full-stack e-commerce lab for detecting, diagnosing, and investigating application-level faults.
+</p>
 
-## Architecture
+---
+
+## ✨ What makes it special?
+
+MiniShop is more than a demo store. It combines **real checkout workflows** with **controlled fault injection**, **distributed tracing**, **latency baselines**, **incident lifecycle management**, and **predefined rectification actions**.
+
+```mermaid
+flowchart LR
+    U[Customer / Admin] --> F[React Storefront]
+    F -->|/api/v1| B[FastAPI Backend]
+    B --> S[Business Services]
+    S --> M[(MongoDB Replica Set)]
+
+    B --> O[Observability]
+    O --> E[Structured Events]
+    O --> T[Distributed Traces]
+    O --> L[Latency Windows]
+
+    L --> P[Baseline + Detection]
+    T --> P
+    P --> I[Rectification Incident]
+    I --> V[Recovery Verification]
 ```
-Browser ──> React (Vite :3000, proxies /api -> backend)
-              │
-              v
-         FastAPI :8000 ── ObservabilityMiddleware (request/trace ids, version check, latency sample, spans)
-              │                │
-              v                v
-          services ──> MongoDB rs0 :27017   (users, products, orders, application_events, audit_logs,
-              │                               api_latency_metrics, api_latency_baselines, trace_spans,
-              │                               rectification_incidents, + latency_samples [raw, TTL])
-              └─ rectification/: rule_catalog · action_registry (definitions only) · ml_interface (contracts only)
+
+> [!IMPORTANT]
+> **Current scope:** fault detection, evidence collection, incident records, ML contracts, and corrective-action definitions are implemented.
+> ML inference and automatic corrective-action execution are **future work**.
+> See [FUTURE_RECTIFICATION.md](docs/FUTURE_RECTIFICATION.md).
+
+---
+
+## 🧭 Platform at a glance
+
+| Area | Experience | Status |
+|---|---|---|
+| Storefront | Products, detail pages, cart, checkout, and orders | ✅ Implemented |
+| Administration | Products, orders, events, overview, and performance | ✅ Implemented |
+| Security | JWT auth, role guards, validation, version compatibility | ✅ Implemented |
+| Reliability | Idempotency, retries, optimistic locks, transactions | ✅ Implemented |
+| Observability | Request IDs, trace IDs, spans, JSON events, metrics | ✅ Implemented |
+| Rectification | Rule catalog, evidence, action proposals, verification | 🔶 POC complete; execution pending |
+
+---
+
+## 🏗️ Architecture
+
+```mermaid
+flowchart TB
+    subgraph UI["Frontend · Port 3000"]
+        R[React 18 + Vite]
+        C[Context API + React Router]
+        A[Axios API Client]
+    end
+
+    subgraph API["Backend · Port 8000"]
+        MW[Observability Middleware]
+        RT[Versioned API Routes]
+        SV[Business Services]
+        RC[Rectification Engine]
+    end
+
+    subgraph DB["MongoDB · Port 27017"]
+        DOC[(Business Collections)]
+        EVT[(Events + Audit Logs)]
+        MET[(Latency Metrics + Baselines)]
+        TRACE[(Trace Spans)]
+        INC[(Rectification Incidents)]
+    end
+
+    R --> C --> A
+    A -->|Vite proxy| MW
+    MW --> RT --> SV --> DOC
+    MW --> EVT
+    MW --> MET
+    MW --> TRACE
+    SV --> RC --> INC
 ```
-Business logic, observability, (future) ML diagnosis, (future) rule-based rectification and verification are
-separate concerns; nothing in the business path calls ML.
 
-## Prerequisites
-Docker Desktop / Docker Engine with Compose v2. (Optional for scenario runner: Python 3.9+; no packages needed.)
+### Technology stack
 
-## Start
+| Layer | Technologies |
+|---|---|
+| Frontend | React 18, Vite 5, React Router 6, Axios, Tailwind CSS |
+| Backend | Python 3.12, FastAPI, Pydantic, JWT, bcrypt |
+| Database | MongoDB 7 single-node replica set |
+| Observability | W3C-style trace headers, structured JSON events, latency windows |
+| Operations | Docker Compose |
+
+---
+
+## 📡 Response-time rectification pipeline
+
+```mermaid
+stateDiagram-v2
+    [*] --> Learning
+    Learning --> Normal: Healthy samples
+    Normal --> Suspect: Relative threshold crossed
+    Suspect --> Degraded: Sustained across windows
+    Degraded --> Incident: 3 consecutive degraded windows
+    Incident --> Verification: Future action or natural recovery
+    Verification --> Closed: Recovery confirmed
+    Verification --> Escalated: Incorrect response or timeout
+    Degraded --> Normal: Recovery without action
+```
+
+**APP-R-056 monitors** endpoint average, P95, and P99 latency against historical baselines. Sustained degradation produces trace-backed evidence and an incident. Corrective actions are proposed but not executed in this POC.
+
+```mermaid
+sequenceDiagram
+    participant App as FastAPI
+    participant Obs as Observability
+    participant Perf as Performance Monitor
+    participant Trace as Trace Store
+    participant Incident as Incident Store
+
+    App->>Obs: Request + response latency
+    Obs->>Trace: Root + DB + business spans
+    Obs->>Perf: Windowed latency sample
+    Perf->>Perf: Compare with baseline
+    Perf->>Trace: Collect degradation evidence
+    Perf->>Incident: Open sustained incident
+    Incident-->>Perf: Await ML / action / recovery
+```
+
+---
+
+## 🚀 Quick start
+
+### Prerequisites
+
+- Docker Desktop or Docker Engine
+- Docker Compose v2
+- Python 3.9+ only for the optional scenario runner
+
+### Launch
+
 ```bash
-cp .env.example .env        # optional; defaults already work
+# Optional: copy defaults to a local environment file
+cp .env.example .env
+
+# Build and start all services
 docker compose up --build -d
 ```
-| URL | |
+
+| Service | URL |
 |---|---|
-| Frontend | http://localhost:3000 |
-| Backend | http://localhost:8000 |
-| Swagger | http://localhost:8000/docs |
+| Storefront | http://localhost:3000 |
+| API | http://localhost:8000 |
+| Swagger / OpenAPI | http://localhost:8000/docs |
 | MongoDB | `mongodb://localhost:27017/?directConnection=true` |
 
-The browser only talks to `http://localhost:3000/api/...`; the Vite dev server proxies to `http://backend:8000`
-inside the Docker network (no Docker-internal hostnames in browser code). First start takes a minute: MongoDB's
-healthcheck initiates the replica set (`rs0`), then the backend waits for the primary, creates indexes and seeds data.
+The browser uses the Vite proxy rather than Docker-internal hostnames. On the first start, MongoDB initializes the `rs0` replica set, then the backend creates indexes and seeds development data.
 
-Stop: `docker compose down` (data persists in the `mongo_data` volume; `docker compose down -v` wipes it).
+```bash
+# Stop containers; keep the mongo_data volume
+docker compose down
 
-## Development login credentials (seeded, development only)
+# Stop containers and remove all POC data
+docker compose down -v
+```
+
+---
+
+## 🔐 Development accounts
+
+Development credentials are seeded automatically and are disabled for production use.
+
 | Role | Email | Password |
 |---|---|---|
 | Administrator | `admin@minishop.dev` | `Admin@12345` |
 | Customer | `customer1@minishop.dev` | `Customer@12345` |
 | Customer | `customer2@minishop.dev` | `Customer@12345` |
 
-Configurable via `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_CUSTOMER_PASSWORD`. The seed refuses default
-passwords when `ENVIRONMENT=production`. Seeding is idempotent (safe on every start).
+Credentials can be configured with `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, and `SEED_CUSTOMER_PASSWORD`.
 
-## Environment configuration
-See [.env.example](.env.example). Key variables: `ENVIRONMENT`, `MONGO_URI`, `MONGO_DB_NAME`, `JWT_SECRET`,
-`ENABLE_DEV_SCENARIOS` (dev fault-injection endpoints; forced off in production), `MONITOR_WINDOW_SECONDS`,
-`TRACE_SAMPLE_RATE`, plus threshold overrides (docs/PERFORMANCE_MONITORING.md).
+---
 
-## Tests
-Tests need MongoDB with a replica set (transactions). They create a **disposable database**
-`minishop_test_<random>` on the compose MongoDB and drop it afterwards; the seeded `minishop` database is never touched.
+## ⚙️ Configuration
+
+Start with [.env.example](.env.example). It contains development-safe defaults.
+
+| Variable | Purpose |
+|---|---|
+| `ENVIRONMENT` | Development or production behavior |
+| `MONGO_URI` / `MONGO_DB_NAME` | MongoDB connection and database |
+| `JWT_SECRET` | Authentication signing secret |
+| `ENABLE_DEV_SCENARIOS` | Mount development fault-injection endpoints |
+| `MONITOR_WINDOW_SECONDS` | Performance window duration |
+| `TRACE_SAMPLE_RATE` | Fraction of traces retained when not in a slow/failed path |
+| `ABSOLUTE_LIMITS_JSON` | Optional absolute endpoint latency limits |
+| `ENDPOINT_THRESHOLDS_JSON` | Optional per-endpoint degradation overrides |
+
+See [PERFORMANCE_MONITORING.md](docs/PERFORMANCE_MONITORING.md) for the complete monitoring model.
+
+---
+
+## 🧪 Controlled fault scenarios
+
 ```bash
-docker compose up -d database
-docker compose run --rm --no-deps -e TEST_MONGO_URI="mongodb://database:27017/?replicaSet=rs0" backend pytest -v
-# or against the running stack:
-docker compose exec backend pytest -v
-```
-Run a subset: `... pytest tests/test_performance.py -v`. Tests cover auth/authorization, validation, orders,
-idempotency, optimistic-lock conflict, state machine, API versioning, duplicate workflows, transaction rollback,
-events, and the APP-R-056 behaviours (latency capture, per-endpoint metrics, percentile maths, baselines,
-contamination protection, sustained detection, isolated spikes, insufficient samples, trace evidence, incident
-records, verification, failed-recovery escalation).
+# Run all nine scenarios
+python scenarios/run_scenarios.py --enable
 
-## Scenario runner (development only, disabled by default)
-```bash
-python scenarios/run_scenarios.py --enable                       # all nine rules
+# Run selected scenarios
 python scenarios/run_scenarios.py --enable --only APP-R-021,APP-R-056
 ```
-Requires the stack running with `ENABLE_DEV_SCENARIOS=true` (compose default for development). It exits if the
-backend does not expose the dev endpoints (e.g. production). Details: [docs/SCENARIOS.md](docs/SCENARIOS.md).
-The APP-R-056 scenario takes ~1 minute and ends with an **OPEN incident** you can inspect in
-*Admin → Performance*; three subsequent normal windows close it as `CLOSED_NO_ACTION`.
 
-## Project layout
-`frontend/` React app · `backend/app/` API (routes, services, observability, rectification) · `backend/scripts/`
-index init + seed · `backend/tests/` · `database/` Mongo image + replica-set healthcheck · `scenarios/` runner ·
-`docs/` documentation.
+The scenario runner requires development fault endpoints and uses the real HTTP API. No authentication or validation bypasses are used.
 
-## Troubleshooting
-* **Backend restarts / "MongoDB primary not available"** – the replica set initiates via the database healthcheck;
-  wait ~30 s, check `docker compose logs database`. If you changed the compose service name, update `RS_HOST`.
-* **Transactions fail ("Transaction numbers are only allowed on a replica set")** – the DB was started without
-  `--replSet`; use the provided `database/Dockerfile`, and `docker compose down -v` to reset a stale volume.
-* **Connecting from the host with a replicaSet URI hangs** – the replica set advertises `database:27017`; use
-  `?directConnection=true` from the host.
-* **Port already in use** – change the left side of the port mappings in `docker-compose.yml`.
-* **Frontend cannot reach API** – requests go through the Vite proxy; check `docker compose logs frontend backend`.
-* **Windows line endings** – the Dockerfile strips CRLF from the healthcheck script.
-* **No performance windows in the dashboard** – windows close every `MONITOR_WINDOW_SECONDS` (60 s) and
-  low-volume endpoints accumulate until percentiles are reliable; the scenario runner forces window closes.
+| Rule | Demonstrated behavior |
+|---|---|
+| APP-R-001 | Malformed requests rejected before business logic |
+| APP-R-002 | API version compatibility and legacy adaptation |
+| APP-R-004 | Business invariant bypass prevention |
+| APP-R-020 | Invalid domain values rejected |
+| APP-R-021 | Duplicate checkout submission prevented |
+| APP-R-030 | Bounded retries with jitter |
+| APP-R-040 | Optimistic-lock conflict resolution |
+| APP-R-041 | Duplicate workflow execution prevented |
+| APP-R-056 | Sustained API response-time degradation |
+
+The APP-R-056 scenario takes roughly one minute, opens a rectification incident, and exposes it under **Admin → Performance**.
+
+Detailed reproduction steps: [SCENARIOS.md](docs/SCENARIOS.md)
+
+---
+
+## 🧬 Rectification coverage
+
+```mermaid
+mindmap
+  root((MiniShop Rectification))
+    Detect
+      Request Validation
+      API Versioning
+      Domain Invariants
+      Latency Baselines
+    Diagnose
+      Structured Events
+      Distributed Traces
+      Bottleneck Evidence
+      ML Contract
+    Protect
+      Idempotency
+      Transactions
+      Optimistic Locks
+      Bounded Retry
+    Verify
+      Recovery Windows
+      Trace Evidence
+      Response Stability
+      Rollback or Escalation
+```
+
+Rule relationships and scope:
+
+- [RECTIFICATION_RULES.md](docs/RECTIFICATION_RULES.md)
+- [PERFORMANCE_MONITORING.md](docs/PERFORMANCE_MONITORING.md)
+- [FUTURE_RECTIFICATION.md](docs/FUTURE_RECTIFICATION.md)
+
+---
+
+## 🧪 Test suite
+
+Tests use a disposable `minishop_test_<random>` database and drop it after the run. The seeded `minishop` database is not touched.
+
+```bash
+# Start MongoDB
+docker compose up -d database
+
+# Run tests in the backend container
+docker compose run --rm --no-deps \
+  -e TEST_MONGO_URI="mongodb://database:27017/?replicaSet=rs0" \
+  backend pytest -v
+
+# Run against the active stack
+docker compose exec backend pytest -v
+
+# Run a focused test module
+docker compose exec backend pytest tests/test_performance.py -v
+```
+
+Coverage includes authentication, authorization, validation, orders, idempotency, optimistic locks, state machines, API versioning, duplicate workflows, transaction rollback, and APP-R-056 latency and incident behavior.
+
+---
+
+## 📁 Project map
+
+```text
+minishop-poc/
+├── frontend/                 React storefront and admin dashboard
+├── backend/
+│   ├── app/
+│   │   ├── routes/           HTTP endpoints
+│   │   ├── services/         Business and monitoring logic
+│   │   ├── observability/    Events, tracing, middleware
+│   │   └── rectification/    Rule, action, and ML contracts
+│   ├── scripts/              Index initialization and seed data
+│   └── tests/                Backend test suite
+├── database/                 MongoDB replica-set image
+├── scenarios/                Controlled fault runner
+├── docs/                     Architecture and rule documentation
+└── docker-compose.yml        Complete local stack
+```
+
+---
+
+## 🔧 Troubleshooting
+
+<details>
+<summary><strong>Backend reports that MongoDB is unavailable</strong></summary>
+
+Wait about 30 seconds, then inspect `docker compose logs database backend`. The database healthcheck initializes the replica set automatically.
+
+</details>
+
+<details>
+<summary><strong>Transactions return replica-set errors</strong></summary>
+
+Use the supplied database service. Reset stale replica-set data with `docker compose down -v`, then start again.
+
+</details>
+
+<details>
+<summary><strong>MongoDB is reachable only inside Docker</strong></summary>
+
+Use `mongodb://localhost:27017/?directConnection=true` from the host. Replica-set host discovery expects Docker service names inside containers.
+
+</details>
+
+<details>
+<summary><strong>The frontend cannot reach the API</strong></summary>
+
+Confirm that both containers are healthy:
+
+```bash
+docker compose ps
+docker compose logs frontend backend
+```
+
+</details>
+
+<details>
+<summary><strong>The performance dashboard has no windows</strong></summary>
+
+Windows close every `MONITOR_WINDOW_SECONDS` by default. Low-volume endpoints accumulate samples until percentile reliability is reached. The scenario runner can force deterministic window closes.
+
+</details>
+
+---
+
+<p align="center">
+  <sub>MiniShop POC · Observability, resilience, and application-level fault rectification</sub>
+</p>
